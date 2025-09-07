@@ -4,9 +4,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, request, Response
 from slackeventsapi import SlackEventAdapter
+import string
 
 env_path = Path('.')/'.env'
 load_dotenv(dotenv_path=env_path)
+
+BADWORDS = ['bad', 'no', 'ugly']
 
 app = Flask(__name__)
 
@@ -62,15 +65,25 @@ class WelcomeMessage:
     return {'type': 'section', 'text': {'type': 'mrkdwn', 'text': text}}
   
 def send_welcome_message(channel, user):
+  
+  if channel not in welcome_messages:
+    welcome_messages[channel] = {}
+
+  if user in welcome_messages[channel]:
+    return
+  
   welcome = WelcomeMessage(channel, user)
   message = welcome.get_message()
   response = client.chat_postMessage(**message)
   welcome.timestamp = response['ts']
 
-  if channel not in welcome_messages:
-    welcome_messages[channel] = {}
   welcome_messages[channel][user] = welcome
 
+def check_if_bad_word(message):
+  msg = message.lower()
+  msg = msg.translate(str.maketrans('', '', string.punctuation))
+
+  return any(word in msg for word in BADWORDS)
 
 @slack_event_adapter.on('message')
 def message(payload):
@@ -88,6 +101,10 @@ def message(payload):
 
     if text.lower() == 'start':
       send_welcome_message(f"@{user_id}", user_id)
+    
+    elif check_if_bad_word(text):
+      ts = event.get('ts')
+      client.chat_postMessage(channel = channel_id, thread_ts = ts, text = "This is a bad word!")
       
     
 @slack_event_adapter.on('reaction_added')
