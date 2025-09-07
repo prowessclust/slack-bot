@@ -89,8 +89,22 @@ def message(payload):
     if text.lower() == 'start':
       send_welcome_message(f"@{user_id}", user_id)
       
-    client.chat_postMessage(channel=channel_id, text=text)
     
+@slack_event_adapter.on('reaction_added')
+def reaction_added(payload):
+  event = payload.get('event', {})
+  channel_id = event.get('item', {}).get('channel')
+  user_id = event.get('user')
+
+  if f'@{user_id}' not in welcome_messages:
+    return
+  
+  welcome = welcome_messages[f'@{user_id}'][user_id]
+  welcome.completed = True
+  welcome.channel = channel_id
+  message = welcome.get_message()
+  updated_message = client.chat_update(**message)
+  welcome.timestamp = updated_message['ts']
 
 @app.route('/message-count', methods=['POST'])
 def message_count():
