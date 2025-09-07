@@ -5,11 +5,17 @@ from dotenv import load_dotenv
 from flask import Flask, request, Response
 from slackeventsapi import SlackEventAdapter
 import string
+from datetime import datetime, timedelta
 
 env_path = Path('.')/'.env'
 load_dotenv(dotenv_path=env_path)
 
 BADWORDS = ['bad', 'no', 'ugly']
+
+SCHEDULED_MESSAGES = [
+  {'text': 'First message', 'post_at': int((datetime.now() + timedelta(seconds=20)).timestamp()), 'channel': 'C09DYD48VJA'},
+  {'text': 'Second message', 'post_at': int((datetime.now() + timedelta(seconds=30)).timestamp()), 'channel' : 'C09DYD48VJA'}
+]
 
 app = Flask(__name__)
 
@@ -78,6 +84,13 @@ def send_welcome_message(channel, user):
   welcome.timestamp = response['ts']
 
   welcome_messages[channel][user] = welcome
+def schedule_messages(messages):
+  ids = []
+  for msg in messages:
+    response = client.chat_scheduleMessage(channel=msg['channel'], text=msg['text'], post_at=msg['post_at'])
+    id_ = response.get('scheduled_message_id')
+    ids.append(id_)
+  return ids
 
 def check_if_bad_word(message):
   msg = message.lower()
@@ -134,8 +147,7 @@ def message_count():
   return Response(), 200
 
 if __name__ == "__main__":
+  ids = schedule_messages(SCHEDULED_MESSAGES)
   app.run(debug=True)
 
 
-
-client.chat_postMessage(channel='#test', text="Hello from Priyanka!")
